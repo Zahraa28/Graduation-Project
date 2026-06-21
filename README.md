@@ -79,22 +79,6 @@ This helps reduce hallucinations and improves response quality.
 -   Personalized recommendations.
 -   Context-aware conversations.
 
-## Limitations
-
--   Accuracy depends on image quality.
--   Damage predictions do not replace professional inspections.
--   External APIs may affect response time.
--   LLMs may occasionally generate inaccurate responses.
--   Market information depends on available sources.
-
-## Future Improvements
-
--   Integrate full RAG architecture.
--   Fine-tune automotive-specific models.
--   Expand multilingual support.
--   Improve damage detection accuracy.
--   Introduce feedback mechanisms for continuous improvement.
-
 ## AI Technologies Used
 
   Component               Technology
