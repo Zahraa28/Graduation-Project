@@ -1,0 +1,1444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CarID — AI Car Identifier</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#f8f9fa;--surface:#fff;--border:#e8e8e8;--text:#1a1a1a;--sub:#888;
+      --blue:#185FA5;--blue-dark:#1450a0;--blue-light:#E6F1FB;--blue-xlight:#f0f6ff;
+      --green-bg:#EAF3DE;--green-text:#27500A;
+      --red-bg:#FCEBEB;--red-text:#791F1F;
+      --yellow-bg:#FAEEDA;--yellow-text:#854F0B;
+      --purple-bg:#EEF0FE;--purple-text:#3C3489;
+      --sidebar:260px;
+    }
+    body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);min-height:100vh;display:flex;align-items:stretch;justify-content:center}
+    #shell{display:flex;width:100%;max-width:1100px;height:100vh;overflow:hidden;box-shadow:0 0 40px rgba(0,0,0,.12)}
+
+    /* ── Sidebar ── */
+    #sidebar{width:var(--sidebar);flex-shrink:0;background:#111827;display:flex;flex-direction:column;overflow:hidden;transition:width .25s}
+    #sidebar.collapsed{width:0}
+    #sb-header{padding:16px 14px 10px;border-bottom:1px solid #1f2937;flex-shrink:0}
+    #sb-header h2{color:#fff;font-size:13px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px}
+    #new-chat-btn{width:100%;padding:8px 12px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:7px;transition:background .15s}
+    #new-chat-btn:hover{background:var(--blue-dark)}
+    #conv-list{flex:1;overflow-y:auto;padding:8px}
+    #conv-list::-webkit-scrollbar{width:4px}
+    #conv-list::-webkit-scrollbar-thumb{background:#374151;border-radius:2px}
+    .conv-item{padding:9px 10px;border-radius:8px;cursor:pointer;margin-bottom:2px;display:flex;align-items:center;gap:6px;transition:background .12s;position:relative}
+    .conv-item:hover{background:#1f2937}
+    .conv-item.active{background:#1e3a5f}
+    .conv-title{font-size:12.5px;color:#d1d5db;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+    .conv-item.active .conv-title{color:#fff;font-weight:600}
+    .conv-del{opacity:0;font-size:12px;color:#6b7280;background:none;border:none;cursor:pointer;padding:2px 5px;border-radius:4px;flex-shrink:0;transition:all .12s}
+    .conv-item:hover .conv-del{opacity:1}
+    .conv-del:hover{color:#ef4444;background:#2d1515}
+    #conv-empty{padding:20px 10px;text-align:center;color:#4b5563;font-size:12px;line-height:1.7;display:none}
+    #sb-footer{padding:12px 14px;border-top:1px solid #1f2937;flex-shrink:0}
+    #user-pill{display:flex;align-items:center;gap:9px}
+    #user-avatar{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
+    #user-name-sb{font-size:13px;color:#d1d5db;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+    /* ── Main ── */
+    #main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--surface)}
+    #topbar{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--surface);flex-shrink:0}
+    #sidebar-toggle{width:34px;height:34px;border:none;background:none;cursor:pointer;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--sub);transition:all .12s;flex-shrink:0}
+    #sidebar-toggle:hover{background:var(--bg);color:var(--text)}
+    .logo-icon{width:34px;height:34px;border-radius:50%;background:var(--blue-light);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    #topbar-title{font-size:15px;font-weight:700;color:var(--text)}
+    #topbar-sub{font-size:12px;color:var(--sub);margin-top:1px;display:flex;align-items:center;gap:6px}
+    #ctx-badge{display:none;font-size:11px;background:var(--blue-light);color:var(--blue);padding:2px 9px;border-radius:99px;font-weight:600;white-space:nowrap}
+
+    /* ── Messages ── */
+    #messages{flex:1;overflow-y:auto;padding:20px 18px;display:flex;flex-direction:column;gap:14px;background:var(--bg)}
+    #messages::-webkit-scrollbar{width:5px}
+    #messages::-webkit-scrollbar-thumb{background:#ddd;border-radius:3px}
+    .msg{max-width:82%;display:flex;flex-direction:column;gap:3px}
+    .msg.bot{align-self:flex-start}
+    .msg.user{align-self:flex-end}
+    .bubble{padding:11px 15px;border-radius:18px;font-size:14px;line-height:1.65}
+    .bot .bubble{background:var(--surface);color:var(--text);border-bottom-left-radius:4px;border:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,.04)}
+    .user .bubble{background:var(--blue);color:#fff;border-bottom-right-radius:4px}
+    .msg-time{font-size:11px;color:#bbb;padding:0 4px}
+    .user .msg-time{text-align:right}
+    .clarify-bubble{border-left:3px solid #f59e0b!important;background:#fffbf0!important}
+    .system-note{align-self:center;font-size:12px;color:var(--sub);padding:5px 16px;background:var(--surface);border-radius:99px;border:1px dashed var(--border);max-width:85%;text-align:center}
+
+    /* ── Streaming cursor ── */
+    .stream-cursor::after{content:'▋';animation:blink .7s infinite;color:var(--blue);font-size:12px;margin-left:2px}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+    /* ── Input row ── */
+    #input-row{border-top:1px solid var(--border);padding:12px 14px;display:flex;gap:7px;align-items:flex-end;background:var(--surface);flex-shrink:0}
+    #user-input{flex:1;resize:none;border:1px solid #ddd;border-radius:20px;padding:9px 15px;font-size:14px;font-family:inherit;background:var(--bg);color:var(--text);min-height:40px;max-height:120px;outline:none;transition:border-color .15s}
+    #user-input:focus{border-color:var(--blue);background:var(--surface)}
+    #send-btn,#img-btn,#mic-btn{width:38px;height:38px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
+    #send-btn{background:var(--blue);color:#fff}
+    #send-btn:hover{background:var(--blue-dark)}
+    #send-btn:disabled{background:#ccc;cursor:default}
+    #img-btn{background:var(--bg);border:1px solid #ddd;color:#666}
+    #img-btn:hover{background:var(--blue-light);border-color:var(--blue);color:var(--blue)}
+    /* ── FEATURE 2: Voice mic button ── */
+    #mic-btn{background:var(--bg);border:1px solid #ddd;color:#666}
+    #mic-btn:hover{background:#fef2f2;border-color:#ef4444;color:#ef4444}
+    #mic-btn.recording{background:#ef4444;border-color:#ef4444;color:#fff;animation:pulse-mic .8s infinite}
+    @keyframes pulse-mic{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.4)}50%{box-shadow:0 0 0 6px rgba(239,68,68,0)}}
+
+    /* ── Upload zone ── */
+    .upload-zone{border:2px dashed #d0d0d0;border-radius:10px;padding:22px 18px;text-align:center;cursor:pointer;transition:all .15s;background:#fafafa}
+    .upload-zone:hover{background:var(--blue-xlight);border-color:var(--blue)}
+    .upload-zone .up-icon{font-size:26px}
+    .upload-zone p{font-size:13px;color:var(--sub);margin-top:5px}
+
+    /* ── Chips ── */
+    .chip-row{display:flex;flex-wrap:wrap;gap:6px;padding:4px 0}
+    .chip{font-size:12px;padding:5px 13px;border-radius:99px;border:1px solid #ddd;background:var(--surface);cursor:pointer;color:#555;transition:all .15s;white-space:nowrap}
+    .chip:hover{background:var(--blue-light);border-color:var(--blue);color:var(--blue)}
+
+    /* ── Typing dots ── */
+    .typing{display:flex;gap:4px;align-items:center;padding:4px 0}
+    .dot{width:7px;height:7px;border-radius:50%;background:#ccc;animation:bounce 1.2s infinite}
+    .dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}
+    @keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-7px)}}
+
+    /* ── Result card ── */
+    .result-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:10px}
+    .badge{display:inline-block;font-size:11px;padding:3px 10px;border-radius:99px;font-weight:700;margin-bottom:9px}
+    .badge-found{background:var(--green-bg);color:var(--green-text)}
+    .badge-uncertain{background:var(--purple-bg);color:var(--purple-text)}
+    .badge-web{background:var(--yellow-bg);color:var(--yellow-text)}
+    .result-card h3{font-size:16px;font-weight:700;color:var(--text);margin-bottom:7px}
+    .confidence-bar{height:4px;border-radius:2px;background:#eee;margin:5px 0 2px;overflow:hidden}
+    .confidence-fill{height:100%;border-radius:2px;transition:width .5s}
+    .conf-high{background:#4CAF50}.conf-med{background:#FF9800}.conf-low{background:#f44336}
+    .spec-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f2f2f2;font-size:13px;gap:8px}
+    .spec-row:last-child{border-bottom:none}
+    .spec-label{color:var(--sub);white-space:nowrap}
+    .spec-val{color:var(--text);font-weight:500;text-align:right}
+    .pros-cons{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+    .pc-box{padding:9px 11px;border-radius:8px;font-size:12.5px;line-height:1.55}
+    .pc-box.pros{background:var(--green-bg);color:var(--green-text)}
+    .pc-box.cons{background:var(--red-bg);color:var(--red-text)}
+    .pc-box strong{display:block;margin-bottom:4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.7}
+
+    /* ── FEATURE 5: Find on AutoHub button ── */
+    .autohub-btn{display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:8px 14px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;text-decoration:none;transition:background .15s}
+    .autohub-btn:hover{background:var(--blue-dark)}
+    .autohub-btn svg{flex-shrink:0}
+
+    /* ── Compare table ── */
+    .compare-wrap{margin-top:4px}
+    .compare-scroll{overflow-x:auto;border-radius:10px;border:1px solid var(--border)}
+    .compare-table{width:100%;border-collapse:collapse;font-size:13px;min-width:360px}
+    .compare-table th{padding:10px 14px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--sub);border-bottom:2px solid var(--border);background:#fafafa}
+    .compare-table th.compare-row-label{width:110px}
+    .compare-table th.compare-car-col{background:var(--blue-light);color:var(--blue);text-align:center;font-size:13px;text-transform:none;letter-spacing:0;font-weight:700}
+    .compare-table td{padding:9px 14px;border-bottom:1px solid #f0f0f0;vertical-align:top;font-size:13px;line-height:1.5}
+    .compare-table tr:last-child td{border-bottom:none}
+    .compare-table td.compare-field-label{font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;background:#fafafa}
+    .compare-table td.compare-cell{text-align:center;white-space:pre-line}
+    .compare-table td.compare-pros{color:var(--green-text)}
+    .compare-table td.compare-cons{color:var(--red-text)}
+    .compare-table tr.compare-verdict-row td{background:var(--blue-xlight);font-weight:600;color:var(--blue)}
+    .compare-table tr:hover td{background:#f8f9ff}
+    .compare-table tr.compare-verdict-row:hover td{background:var(--blue-light)}
+    .compare-summary{margin-top:10px;padding:12px 14px;background:var(--blue-xlight);border-radius:8px;font-size:13.5px;line-height:1.65;color:#1a2a4a;border-left:3px solid var(--blue)}
+
+    /* ── Option buttons ── */
+    .options-wrap{display:flex;flex-direction:column;gap:8px;padding:4px 0;max-width:420px}
+    .option-btn{padding:11px 16px;border-radius:12px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;font-family:inherit;cursor:pointer;text-align:left;transition:all .15s;line-height:1.4;display:flex;align-items:center;gap:10px}
+    .option-btn:hover{border-color:var(--blue);background:var(--blue-light);color:var(--blue)}
+    .option-btn:active{transform:scale(.98)}
+    .opt-icon{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;font-weight:700;color:var(--sub);transition:all .15s}
+    .option-btn:hover .opt-icon{border-color:var(--blue);color:var(--blue);background:var(--blue-light)}
+    .options-disabled .option-btn{pointer-events:none;opacity:.45}
+
+    /* ── FEATURE 3: Car of the Day starter cards ── */
+    .starter-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:4px}
+    .starter-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;cursor:pointer;transition:all .18s;text-align:left}
+    .starter-card:hover{border-color:var(--blue);background:var(--blue-xlight);transform:translateY(-2px);box-shadow:0 4px 16px rgba(24,95,165,.1)}
+    .starter-card .sc-emoji{font-size:22px;margin-bottom:6px}
+    .starter-card .sc-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px}
+    .starter-card .sc-sub{font-size:11.5px;color:var(--sub);line-height:1.4}
+
+    /* ── Damage scan button ── */
+    #dmg-btn{background:var(--bg);border:1px solid #ddd;color:#666;width:38px;height:38px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;border:1px solid #ddd}
+    #dmg-btn:hover{background:#fef2f2;border-color:#ef4444;color:#ef4444}
+
+    /* ── Intent picker card ── */
+    .intent-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-top:4px;max-width:520px}
+    .intent-card-title{font-size:13px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px}
+    .intent-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .intent-opt{display:flex;flex-direction:column;gap:3px;padding:11px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg);cursor:pointer;transition:all .15s;text-align:left}
+    .intent-opt:hover{border-color:var(--blue);background:var(--blue-light);transform:translateY(-1px);box-shadow:0 3px 10px rgba(24,95,165,.1)}
+    .intent-opt.danger:hover{border-color:#ef4444;background:#fef2f2}
+    .intent-opt .io-icon{font-size:18px;margin-bottom:2px}
+    .intent-opt .io-label{font-size:13px;font-weight:700;color:var(--text)}
+    .intent-opt .io-sub{font-size:11px;color:var(--sub);line-height:1.4}
+    .intent-opt:hover .io-label{color:var(--blue)}
+    .intent-opt.danger:hover .io-label{color:#ef4444}
+    .intent-grid.disabled .intent-opt{pointer-events:none;opacity:.4}
+
+    /* ── Damage card ── */
+    .dmg-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-top:8px;max-width:560px}
+    .no-drive-banner{background:#ef4444;color:#fff;padding:10px 14px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;letter-spacing:.02em}
+    .dmg-header{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px}
+    .dmg-overall{font-size:15px;font-weight:700;color:var(--text)}
+    .dmg-cost{font-size:13px;color:var(--sub);font-weight:600}
+    .dmg-section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--sub);padding:10px 14px 6px;background:var(--bg);border-bottom:1px solid var(--border)}
+    .dmg-area-row{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:1px solid #f5f5f5}
+    .dmg-area-row:last-child{border-bottom:none}
+    .dmg-emoji{font-size:16px;flex-shrink:0;margin-top:1px}
+    .dmg-area-info{flex:1}
+    .dmg-area-top{display:flex;align-items:center;gap:7px;margin-bottom:3px;flex-wrap:wrap}
+    .dmg-component{font-size:13px;font-weight:700;color:var(--text)}
+    .dmg-desc{font-size:12.5px;color:var(--sub);line-height:1.5}
+    .dmg-cost-range{font-size:12px;color:var(--sub);margin-top:2px}
+    /* Severity badges */
+    .sev-badge{font-size:10px;padding:2px 8px;border-radius:99px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;flex-shrink:0}
+    .sev-minor{background:#EAF3DE;color:#27500A}
+    .sev-moderate{background:#FFF3CD;color:#856404}
+    .sev-severe{background:#FCEBEB;color:#791F1F}
+    .sev-critical{background:#1a1a1a;color:#fff}
+    /* Internal risk rows */
+    .int-risk-row{display:flex;align-items:flex-start;gap:10px;padding:9px 14px;border-bottom:1px solid #f5f5f5}
+    .int-risk-row:last-child{border-bottom:none}
+    .int-risk-info{flex:1}
+    .int-risk-top{display:flex;align-items:center;gap:7px;margin-bottom:2px;flex-wrap:wrap}
+    /* Likelihood badges */
+    .lik-badge{font-size:10px;padding:2px 8px;border-radius:99px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+    .lik-likely{background:#FCEBEB;color:#791F1F}
+    .lik-possible{background:#FFF3CD;color:#856404}
+    .lik-unlikely{background:#EEF0FE;color:#3C3489}
+    /* Disclaimer box */
+    .dmg-disclaimer{margin:8px 14px 12px;padding:9px 12px;background:#fffbf0;border:1px solid #f59e0b;border-radius:8px;font-size:11.5px;color:#854F0B;line-height:1.5}
+    /* Priority actions */
+    .dmg-priority-row{padding:10px 14px}
+    .dmg-priority-item{display:flex;gap:8px;align-items:flex-start;margin-bottom:6px;font-size:13px;color:var(--text)}
+    .dmg-priority-item:last-child{margin-bottom:0}
+    .dmg-priority-num{width:20px;height:20px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+
+    /* ── Misc ── */
+    #file-input,#damage-input{display:none}
+    ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#ddd;border-radius:3px}
+    @media(max-width:640px){
+      #sidebar{position:absolute;left:0;top:0;height:100%;z-index:50}
+      #sidebar.collapsed{width:0;overflow:hidden}
+      #shell{max-width:100%}
+    }
+    @media(prefers-color-scheme:dark){
+      :root{--bg:#111;--surface:#1a1a1a;--border:#2a2a2a;--text:#f0f0f0;--sub:#777;--blue-xlight:#0e1f33;--blue-light:#12273d}
+      body{background:#0a0a0a}
+      .bot .bubble{background:#222;border-color:#2a2a2a}
+      #user-input{background:#222;color:#f0f0f0;border-color:#333}
+      #user-input:focus{background:#1a1a1a}
+      #img-btn,#mic-btn{background:#222;border-color:#333;color:#aaa}
+      .chip{background:#222;border-color:#333;color:#bbb}
+      .chip:hover{background:#12273d;border-color:var(--blue);color:#7eb8f7}
+      .result-card,.starter-card{background:#222;border-color:#333}
+      .starter-card:hover{background:#0e1f33;border-color:var(--blue)}
+      .sc-title{color:#f0f0f0!important}
+      .spec-row{border-color:#333}
+      .compare-scroll{border-color:#333}
+      .compare-table th,.compare-table td{border-color:#2a2a2a}
+      .compare-table th,.compare-table td.compare-field-label{background:#1a1a1a}
+      .compare-summary{background:#0e1f33;color:#cce0ff}
+      .upload-zone{background:#1a1a1a;border-color:#333}
+      .option-btn{background:#222;border-color:#333;color:#e0e0e0}
+      .option-btn:hover{background:#12273d;border-color:var(--blue);color:#7eb8f7}
+      .opt-icon{border-color:#444;color:#777}
+      .clarify-bubble{background:#1a1500!important}
+      .system-note{background:#222;border-color:#333}
+      .intent-card{background:#222;border-color:#333}
+      .intent-opt{background:#1a1a1a;border-color:#333}
+      .intent-opt:hover{background:#12273d}
+      .intent-opt.danger:hover{background:#2d1515}
+      .io-label{color:#f0f0f0!important}
+      .dmg-card{background:#222;border-color:#333}
+      .dmg-header{border-color:#333}
+      .dmg-section-title{background:#1a1a1a;border-color:#2a2a2a}
+      .dmg-area-row,.int-risk-row{border-color:#2a2a2a}
+      .dmg-component{color:#f0f0f0}
+      .sev-critical{background:#f0f0f0;color:#111}
+      .dmg-disclaimer{background:#1a1500;border-color:#f59e0b;color:#fbbf24}
+    }
+  </style>
+</head>
+<body>
+<div id="shell">
+
+  <!-- ── Sidebar ── -->
+  <div id="sidebar">
+    <div id="sb-header">
+      <h2>Conversations</h2>
+      <button id="new-chat-btn" onclick="startNewChat()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        New Chat
+      </button>
+    </div>
+    <div id="conv-list">
+      <div id="conv-empty">No conversations yet.<br>Start chatting below!</div>
+    </div>
+    <div id="sb-footer">
+      <div id="user-pill">
+        <div id="user-avatar">🚗</div>
+        <span id="user-name-sb">CarID User</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Main ── -->
+  <div id="main">
+    <div id="topbar">
+      <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#185FA5" stroke-width="1.8" width="18" height="18">
+          <path d="M5 17H3a2 2 0 01-2-2v-4a2 2 0 012-2h1l2-4h12l2 4h1a2 2 0 012 2v4a2 2 0 01-2 2h-2"/>
+          <circle cx="7.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="17.5" r="2.5"/>
+          <path d="M7.5 17.5h9"/>
+        </svg>
+      </div>
+      <div>
+        <div id="topbar-title">CarID — AI Car Identifier</div>
+        <div id="topbar-sub">
+          Upload a photo or ask anything about a car
+          <span id="ctx-badge">🚗</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="messages"></div>
+
+    <div id="input-row">
+      <button id="img-btn" title="Upload car image" onclick="document.getElementById('file-input').click()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/>
+          <path d="M21 15l-5-5L5 21"/>
+        </svg>
+      </button>
+      <!-- Damage scan button -->
+      <button id="dmg-btn" title="Scan for damage" onclick="document.getElementById('damage-input').click()">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          <path d="M11 8v3l2 2"/>
+        </svg>
+      </button>
+      <!-- FEATURE 2: Voice mic button -->
+      <button id="mic-btn" title="Voice input" onclick="toggleVoice()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
+      </button>
+      <textarea id="user-input" placeholder="Ask about any car, compare models, or upload a photo…" rows="1" onkeydown="handleKey(event)"></textarea>
+      <button id="send-btn" onclick="sendMessage()" title="Send">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2">
+          <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="file-input" accept="image/*">
+<input type="file" id="damage-input" accept="image/*">
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════════
+const AUTOHUB = 'https://graduation-project-autohub-production.up.railway.app/api/ai';
+const AUTOHUB_POSTS = 'https://graduation-project-autohub-production.up.railway.app/api/posts';
+const CARID   = window.location.origin;
+
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+let sessions    = [];
+let activeId    = null;
+let pendingB64  = null;
+let pendingType = null;
+let isStreaming = false;
+let userLocation = '';
+let userLang     = 'en';   // 'ar' | 'en' — auto-detected from input
+
+// ── Arabic detection ──────────────────────────────────────────
+const ARABIC_RE = /[\u0600-\u06FF]/;
+function isArabic(text){ return ARABIC_RE.test(text); }
+function detectLang(text){ return isArabic(text) ? 'ar' : 'en'; }
+
+const EMPTY_PROFILE = {budget:'',priority:'',usage:'',fuel_pref:'',body_pref:'',location:'',currency:'USD',questions_asked:0};
+const BRANDS = ['BMW','Mercedes','Audi','Toyota','Honda','Ford','Alfa Romeo','Volkswagen',
+                'Porsche','Ferrari','Lamborghini','Hyundai','Kia','Renault','Peugeot',
+                'Fiat','Volvo','Mazda','Subaru','Nissan','Jeep','Tesla','Lexus','MG','Mitsubishi'];
+
+// ── Auth ─────────────────────────────────────────────────────
+function authHeaders(){
+  const t = localStorage.getItem('autohub_token');
+  return t ? {Authorization:`Bearer ${t}`} : {};
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SESSION HELPERS
+// ═══════════════════════════════════════════════════════════════
+function getSession(id){ return sessions.find(s=>s.id===id); }
+
+function updateSession(id, patch){
+  sessions = sessions.map(s=> s.id===id ? {...s,...patch,updatedAt:Date.now()} : s)
+                     .sort((a,b)=>b.updatedAt-a.updatedAt);
+  renderConvList();
+}
+
+function pushHistory(id, role, content){
+  const s = getSession(id); if(!s) return;
+  const hist = [...s.history,{role,content}].slice(-24);
+  updateSession(id,{history:hist});
+}
+
+function setCarCtx(id, ctx){
+  updateSession(id,{carCtx:ctx});
+  updateCtxBadge(ctx);
+}
+
+function inferBrand(text){
+  const lower=text.toLowerCase();
+  for(const b of BRANDS){ if(lower.includes(b.toLowerCase())) return b; }
+  return null;
+}
+
+function makeSession(id,title='New Chat'){
+  return {id,title,history:[],carCtx:null,buyerMode:false,
+          buyerProfile:{...EMPTY_PROFILE},updatedAt:Date.now()};
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AUTOHUB API
+// ═══════════════════════════════════════════════════════════════
+async function fetchConversations(){
+  try{
+    const r=await fetch(`${AUTOHUB}/conversations`,{headers:authHeaders()});
+    if(!r.ok) return [];
+    const data=await r.json();
+    return Array.isArray(data)?data:(data.conversations||data.data||[]);
+  }catch(e){ return []; }
+}
+
+async function fetchMessages(convId){
+  try{
+    const r=await fetch(`${AUTOHUB}/conversations/${convId}/messages`,{headers:authHeaders()});
+    if(!r.ok) return [];
+    const data=await r.json();
+    return Array.isArray(data)?data:(data.messages||data.data||[]);
+  }catch(e){ return []; }
+}
+
+async function deleteConvApi(convId){
+  try{ await fetch(`${AUTOHUB}/conversations/${convId}`,{method:'DELETE',headers:authHeaders()}); }catch(e){}
+}
+
+async function persistMessage(userMsg, assistantMsg, convId){
+  try{
+    const r=await fetch(`${AUTOHUB}/chat`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json',...authHeaders()},
+      body:JSON.stringify({message:userMsg,response:assistantMsg,conversation_id:convId||undefined}),
+    });
+    if(r.ok){
+      const data=await r.json();
+      const newId=data?.conversation_id||data?.id||data?.conversationId;
+      if(newId&&!convId) return String(newId);
+    }
+  }catch(e){}
+  return null;
+}
+
+// FEATURE 5: Search AutoHub posts for a car
+async function searchAutoHubPosts(brand, model){
+  try{
+    const q=encodeURIComponent(`${brand} ${model}`.trim());
+    const r=await fetch(`${AUTOHUB_POSTS}?search=${q}&limit=3`,{headers:authHeaders()});
+    if(!r.ok) return [];
+    const data=await r.json();
+    return Array.isArray(data)?data:(data.posts||data.data||[]);
+  }catch(e){ return []; }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SIDEBAR
+// ═══════════════════════════════════════════════════════════════
+function renderConvList(){
+  const list=document.getElementById('conv-list');
+  const empty=document.getElementById('conv-empty');
+  list.querySelectorAll('.conv-item').forEach(el=>el.remove());
+  if(!sessions.length){ empty.style.display='block'; return; }
+  empty.style.display='none';
+  sessions.forEach(s=>{
+    const d=document.createElement('div');
+    d.className='conv-item'+(s.id===activeId?' active':'');
+    d.dataset.id=s.id;
+    const ctx=s.carCtx?.brand?`<span style="font-size:10px;background:#1e3a5f;color:#7eb8f7;padding:2px 6px;border-radius:99px;flex-shrink:0">🚗 ${s.carCtx.brand}</span>`:'';
+    d.innerHTML=`<span class="conv-title" title="${esc(s.title)}">${esc(s.title)}</span>${ctx}<button class="conv-del" onclick="deleteConv(event,'${s.id}')" title="Delete">✕</button>`;
+    d.addEventListener('click',()=>openSession(s.id));
+    list.insertBefore(d,empty);
+  });
+}
+
+function toggleSidebar(){ document.getElementById('sidebar').classList.toggle('collapsed'); }
+
+// ═══════════════════════════════════════════════════════════════
+// SESSION SWITCHING
+// ═══════════════════════════════════════════════════════════════
+async function openSession(id){
+  if(id===activeId) return;
+  activeId=id; clearMessages(); renderConvList();
+  updateCtxBadge(getSession(id)?.carCtx);
+  addSystemNote('Loading conversation…');
+  const rawMsgs=await fetchMessages(id);
+  clearMessages();
+  if(!rawMsgs.length){ addSystemNote('Empty conversation — send a message to start!'); return; }
+  const hist=[];
+  let carCtx=null;
+  rawMsgs.forEach(m=>{
+    const role=m.role||(m.sender==='user'?'user':'assistant');
+    const content=m.content||m.text||m.message||'';
+    if(!content) return;
+    const ts=m.createdAt?new Date(m.createdAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):now();
+    role==='user'?addBubble('user',esc(content),ts):addBubble('bot',content,ts);
+    hist.push({role:role==='user'?'user':'assistant',content});
+    if(role!=='user'&&!carCtx){ const b=inferBrand(content); if(b) carCtx={brand:b}; }
+  });
+  updateSession(id,{history:hist.slice(-20),carCtx});
+  if(carCtx) updateCtxBadge(carCtx);
+  addSystemNote(`✓ ${rawMsgs.length} messages loaded — continuing where you left off.`);
+}
+
+async function startNewChat(skipApi=false){
+  const id=Date.now().toString();
+  sessions=[makeSession(id),...sessions];
+  activeId=id; renderConvList(); clearMessages();
+  updateCtxBadge(null); bootWelcome();
+  if(!skipApi){
+    try{ await fetch(`${AUTOHUB}/conversations`,{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({title:'New Chat'})}); }catch(e){}
+  }
+}
+
+async function deleteConv(e,id){
+  e.stopPropagation();
+  if(!confirm('Delete this conversation?')) return;
+  sessions=sessions.filter(s=>s.id!==id);
+  if(id===activeId){ activeId=null; }
+  renderConvList();
+  if(!activeId&&sessions.length) openSession(sessions[0].id);
+  else if(!activeId) startNewChat(true);
+  deleteConvApi(id);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════════════════════
+const msgsEl  = document.getElementById('messages');
+const inputEl = document.getElementById('user-input');
+const ctxBadge= document.getElementById('ctx-badge');
+
+function now(){ return new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); }
+function esc(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+function bad(v){ return !v||['---','not_available','—','not available','n/a',''].includes(String(v).trim().toLowerCase()); }
+function clearMessages(){ msgsEl.innerHTML=''; }
+
+function addBubble(role, html, time, extraCls=''){
+  const isAr = ARABIC_RE.test(html.replace(/<[^>]+>/g,''));
+  const dir   = isAr ? ' dir="rtl" style="text-align:right"' : '';
+  const d=document.createElement('div'); d.className=`msg ${role}`;
+  d.innerHTML=`<div class="bubble ${extraCls}"${dir}>${html}</div><span class="msg-time">${time||now()}</span>`;
+  msgsEl.appendChild(d); msgsEl.scrollTop=msgsEl.scrollHeight; return d;
+}
+
+function addSystemNote(text){
+  const d=document.createElement('div'); d.className='system-note'; d.textContent=text;
+  msgsEl.appendChild(d); msgsEl.scrollTop=msgsEl.scrollHeight;
+}
+
+function addTypingIndicator(){
+  const d=document.createElement('div'); d.className='msg bot'; d.id='typing-indicator';
+  d.innerHTML=`<div class="bubble"><div class="typing"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div>`;
+  msgsEl.appendChild(d); msgsEl.scrollTop=msgsEl.scrollHeight;
+}
+function removeTyping(){ document.getElementById('typing-indicator')?.remove(); }
+
+function addChips(chips){
+  if(!chips?.length) return;
+  const d=document.createElement('div'); d.className='msg bot';
+  d.innerHTML=`<div class="bubble" style="padding:10px 14px"><div class="chip-row">${chips.map(c=>`<button class="chip" onclick="chipClick(this.textContent)">${c}</button>`).join('')}</div></div>`;
+  msgsEl.appendChild(d); msgsEl.scrollTop=msgsEl.scrollHeight;
+}
+function chipClick(t){ inputEl.value=t; sendMessage(); }
+
+function updateCtxBadge(ctx){
+  if(ctx?.brand){ ctxBadge.textContent=`🚗 ${ctx.brand} ${ctx.model||''}`.trim(); ctxBadge.style.display='inline-flex'; }
+  else ctxBadge.style.display='none';
+}
+
+// FEATURE 4: Markdown → HTML (fixes **bold**, numbered lists, bullets)
+function mdToHtml(text){
+  return text
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*([^*]+?)\*/g,'<em>$1</em>')
+    .replace(/^(\d+)\.\s(.+)$/gm,'<div style="margin:3px 0"><strong>$1.</strong> $2</div>')
+    .replace(/^[-•]\s(.+)$/gm,'<div style="margin:2px 0 2px 8px">• $1</div>')
+    .replace(/\n\n/g,'<br><br>')
+    .replace(/\n/g,'<br>');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FEATURE 1: STREAMING RESPONSES
+// ═══════════════════════════════════════════════════════════════
+async function streamChat(payload){
+  // Try streaming endpoint first, fall back to normal
+  try{
+    const r=await fetch(`${CARID}/chat/stream`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload),
+    });
+    if(!r.ok||!r.body) throw new Error('no stream');
+
+    removeTyping();
+    const d=document.createElement('div'); d.className='msg bot';
+    const bubble=document.createElement('div'); bubble.className='bubble stream-cursor';
+    const timeEl=document.createElement('span'); timeEl.className='msg-time'; timeEl.textContent=now();
+    d.appendChild(bubble); d.appendChild(timeEl);
+    msgsEl.appendChild(d);
+
+    const reader=r.body.getReader();
+    const decoder=new TextDecoder();
+    let full=''; let result={intent:'chat',options:[],compare_data:[],recommendations:[],buyer_mode:false,buyer_profile:{}};
+
+    while(true){
+      const {done,value}=await reader.read();
+      if(done) break;
+      const chunk=decoder.decode(value);
+      const lines=chunk.split('\n');
+      for(const line of lines){
+        if(line.startsWith('data: ')){
+          try{
+            const json=JSON.parse(line.slice(6));
+            if(json.token){ full+=json.token; bubble.innerHTML=mdToHtml(full); msgsEl.scrollTop=msgsEl.scrollHeight; }
+            if(json.done){ result={...result,...json}; bubble.classList.remove('stream-cursor'); }
+          }catch(e){}
+        }
+      }
+    }
+    return {answer:full,...result};
+  }catch(e){
+    // Fall back to normal /chat endpoint
+    const r=await fetch(`${CARID}/chat`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    return r.json();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FEATURE 2: VOICE INPUT
+// ═══════════════════════════════════════════════════════════════
+let recognition=null;
+let isRecording=false;
+
+function initVoice(){
+  const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SpeechRecognition) return false;
+  recognition=new SpeechRecognition();
+  recognition.continuous=false;
+  recognition.interimResults=true;
+  recognition.lang='en-US';
+  recognition.onresult=e=>{
+    let interim='',final='';
+    for(const r of e.results){ r.isFinal?final+=r[0].transcript:interim+=r[0].transcript; }
+    inputEl.value=(final||interim);
+    inputEl.style.height='40px'; inputEl.style.height=Math.min(inputEl.scrollHeight,120)+'px';
+  };
+  recognition.onend=()=>{
+    isRecording=false;
+    document.getElementById('mic-btn').classList.remove('recording');
+    if(inputEl.value.trim()) sendMessage();
+  };
+  recognition.onerror=()=>{ isRecording=false; document.getElementById('mic-btn').classList.remove('recording'); };
+  return true;
+}
+
+function toggleVoice(){
+  const btn=document.getElementById('mic-btn');
+  if(!recognition&&!initVoice()){
+    addSystemNote('Voice input not supported in this browser. Try Chrome.');
+    return;
+  }
+  if(isRecording){ recognition.stop(); }
+  else{
+    isRecording=true; btn.classList.add('recording');
+    inputEl.value=''; inputEl.placeholder='Listening…';
+    recognition.start();
+    setTimeout(()=>{ inputEl.placeholder='Ask about any car, compare models, or upload a photo…'; },100);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FEATURE 3: SMART CHIPS — generated from context
+// ═══════════════════════════════════════════════════════════════
+function smartChips(answer, carCtx, intent){
+  // Intent-specific chips
+  if(intent==='recommend') return [];  // recommendations already add car chips
+  if(intent==='buyer')     return [];  // buyer flow uses option buttons
+
+  const chips=[];
+  const lower=answer.toLowerCase();
+  const car=carCtx?.brand?`${carCtx.brand} ${carCtx.model||''}`.trim():'it';
+
+  // Context-aware chips based on what the answer mentioned
+  if(/engine|horsepower|hp|torque|cylinder/i.test(answer))      chips.push(`What's the fuel consumption of the ${car}?`);
+  if(/reliab|problem|issue|common fault/i.test(answer))          chips.push(`What are the most common problems with the ${car}?`);
+  if(/price|cost|\$|egp|budget/i.test(answer))                   chips.push(`Is the ${car} worth buying used?`);
+  if(/family|space|seat|boot|cargo/i.test(answer))               chips.push(`What's the safety rating of the ${car}?`);
+  if(/fuel|petrol|diesel|hybrid|electric/i.test(answer))         chips.push(`What's the running cost of the ${car}?`);
+  if(/compare|vs|versus/i.test(lower)&&carCtx?.brand)            chips.push(`Compare ${car} vs a similar car`);
+
+  // Always add a follow-up and compare if we have car context
+  if(carCtx?.brand&&chips.length<2) chips.push(`Tell me more about the ${car}`);
+  if(chips.length<3)                chips.push('Compare with similar cars');
+
+  return chips.slice(0,3);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INTENT PICKER — shown after any image upload
+// ═══════════════════════════════════════════════════════════════
+
+const CAR_INTENTS = [
+  {icon:'🔍', label:'Identify this car',    sub:'Brand, model, year & generation',              action:'identify'},
+  {icon:'📋', label:'Full specs',           sub:'Engine, power, dimensions & fuel',             action:'specs'},
+  {icon:'🛒', label:'Is it worth buying?',  sub:'Value, reliability & what to check',           action:'worth'},
+  {icon:'⚠️', label:'Common problems',      sub:'Known issues & things to watch out for',       action:'problems'},
+  {icon:'💰', label:'Price & market value', sub:'What it sells for today',                      action:'price'},
+  {icon:'🔧', label:'Maintenance tips',     sub:'Service intervals & running costs',            action:'maintenance'},
+];
+
+const DAMAGE_INTENTS = [
+  {icon:'📋', label:'Full damage report',      sub:'Every damaged area, severity & total cost',        action:'full'},
+  {icon:'🚦', label:'Is it safe to drive?',   sub:'Quick safety check',                               action:'safe',    danger:true},
+  {icon:'💸', label:'Repair cost estimate',    sub:'How much will it cost to fix everything?',         action:'cost'},
+  {icon:'🔧', label:'Hidden & internal damage',sub:"What might be broken inside that I can't see?",   action:'internal'},
+  {icon:'🛒', label:'Should I buy this car?',  sub:'Worth repairing or buying at a discount?',        action:'buy'},
+  {icon:'⚡', label:'Quick summary',           sub:'Just the key points in 2–3 sentences',            action:'quick'},
+];
+
+const ACTION_PROMPTS = {
+  // Car intents
+  identify:    'Identify this car — what is the brand, model, year and generation?',
+  specs:       'Give me the full specs of this car — engine, power, dimensions and fuel type.',
+  worth:       'Is this car worth buying? Give me reliability, value and what to check.',
+  problems:    'What are the common problems and known issues with this car?',
+  price:       'What is the current market value and price range for this car?',
+  maintenance: 'What are the maintenance tips, service intervals and running costs for this car?',
+  // Damage intents
+  full:        'Give me a full damage report — every damaged area, severity rating and total repair cost.',
+  safe:        'Is this car safe to drive? Give me a quick safety assessment.',
+  cost:        'Give me a detailed repair cost estimate for all the damage visible.',
+  internal:    'What hidden or internal damage might this car have that I cannot see?',
+  buy:         'Should I buy this car given the damage? Is it worth repairing or buying at a discount?',
+  quick:       'Give me a quick 2-3 sentence summary of the damage and most urgent issues.',
+};
+
+let pendingDamageB64  = null;
+let pendingDamageType = null;
+let pendingCarB64     = null;
+let pendingCarType    = null;
+let pendingIsForDamage = false;  // tracks which picker to show
+
+function showIntentPicker(b64, imgType, isDamage){
+  const intents = isDamage ? DAMAGE_INTENTS : CAR_INTENTS;
+  const title   = isDamage ? '🔍 What do you want to know about this damage?' : '🚗 What do you want to know?';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'msg bot';
+  const grid = intents.map((it,i) =>
+    `<div class="intent-opt${it.danger?' danger':''}" data-action="${it.action}">
+      <span class="io-icon">${it.icon}</span>
+      <span class="io-label">${it.label}</span>
+      <span class="io-sub">${it.sub}</span>
+    </div>`
+  ).join('');
+
+  wrap.innerHTML = `<div class="bubble" style="padding:12px 14px">
+    <div class="intent-card-title">${title}</div>
+    <div class="intent-grid">${grid}</div>
+  </div><span class="msg-time">${now()}</span>`;
+
+  wrap.querySelectorAll('.intent-opt').forEach(btn => {
+    btn.addEventListener('click', () => {
+      // Disable grid
+      wrap.querySelector('.intent-grid').classList.add('disabled');
+      btn.style.borderColor = 'var(--blue)';
+      btn.style.background  = 'var(--blue-light)';
+
+      const action = btn.dataset.action;
+      const label  = btn.querySelector('.io-label').textContent;
+      // Show as user message
+      addBubble('user', esc(label));
+
+      if(isDamage){
+        pendingDamageB64  = b64;
+        pendingDamageType = imgType;
+        dispatchDamageAction(action);
+      } else {
+        // Pass b64/imgType directly — do NOT rely on pendingB64 which may be null
+        const prompt = ACTION_PROMPTS[action] || 'Tell me about this car.';
+        triggerCarIntent(prompt, b64, imgType);
+      }
+    });
+  });
+
+  msgsEl.appendChild(wrap);
+  msgsEl.scrollTop = msgsEl.scrollHeight;
+}
+
+async function triggerCarIntent(prompt, b64, imgType){
+  addTypingIndicator();
+  document.getElementById('send-btn').disabled = true;
+  try{
+    await handleImageWithIntent(b64, imgType, prompt);
+  } catch(e){
+    removeTyping();
+    addBubble('bot', `⚠️ Error: ${e.message}`);
+  }
+  document.getElementById('send-btn').disabled = false;
+}
+
+// ── Image with a chosen intent → /identify or /chat ──────────
+async function handleImageWithIntent(b64, imgType, intentPrompt){
+  const blob = await (await fetch(`data:${imgType};base64,${b64}`)).blob();
+  const form = new FormData();
+
+  if(intentPrompt.startsWith('Identify')){
+    // Use /identify for car identification
+    form.append('file', blob, 'car.jpg');
+    const r      = await fetch(`${CARID}/identify`, {method:'POST', body:form});
+    const result = await r.json();
+    removeTyping();
+
+    const car    = result.details || {};
+    const msg    = result.message || 'Car identified!';
+    const status = result.status  || 'unknown';
+
+    if(status === 'unknown' || !car.brand){ addBubble('bot', msg); return; }
+
+    setCarCtx(activeId, car);
+    const card  = buildResultCard(car, result.confidence, status);
+    const ahBtn = buildAutoHubBtn(car.brand, car.model);
+    const d = document.createElement('div'); d.className = 'msg bot';
+    d.innerHTML = `<div class="bubble">${msg}${card}${ahBtn}</div><span class="msg-time">${now()}</span>`;
+    msgsEl.appendChild(d); msgsEl.scrollTop = msgsEl.scrollHeight;
+
+    const entry = `[Photo] Identified: ${car.brand} ${car.model}${car.generation?' ('+car.generation+')':''}. ${msg}`;
+    pushHistory(activeId, 'assistant', entry);
+    persistMessage('[Uploaded car photo]', entry, getSession(activeId)?.convId||null)
+      .then(id=>{ if(id) updateSession(activeId,{convId:id}); });
+    const n = `${car.brand} ${car.model}`.trim();
+    addChips([`What's the engine on the ${n}?`, `Is the ${n} reliable?`, `Compare ${n} vs a similar car`]);
+
+  } else {
+    // For all other intents: first identify the car, then ask the question
+    // Step 1 — silently identify the car so we know what we're looking at
+    const idForm = new FormData();
+    idForm.append('file', blob, 'car.jpg');
+    let carLabel = 'this car';
+    try{
+      const idR  = await fetch(`${CARID}/identify`, {method:'POST', body:idForm});
+      const idRes = await idR.json();
+      if(idRes.details?.brand){
+        const c = idRes.details;
+        carLabel = `${c.brand} ${c.model}${c.generation?' ('+c.generation+')':''}`.trim();
+        setCarCtx(activeId, c);
+      }
+    } catch(e){ /* silent — proceed with generic label */ }
+
+    // Step 2 — ask the specific question via /chat (text only, with car context)
+    const s = getSession(activeId);
+    const fullQuestion = `${intentPrompt} The car in the image appears to be a ${carLabel}.`;
+
+    const r = await fetch(`${CARID}/chat`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        question:      fullQuestion,
+        message:       fullQuestion,
+        conversationId: s?.convId || '',
+        history:       (s?.history || []).slice(-10),
+        car_context:   s?.carCtx  || {},
+        buyer_mode:    false,
+        buyer_profile: {},
+      }),
+    });
+    const result = await r.json();
+    removeTyping();
+
+    const ans = result.answer || result.reply || 'Sorry, I could not get an answer.';
+    await animateText(ans);
+    pushHistory(activeId, 'assistant', ans);
+    persistMessage(intentPrompt, ans, s?.convId).then(id=>{ if(id) updateSession(activeId,{convId:id}); });
+    addChips(smartChips(ans, getSession(activeId)?.carCtx, 'chat'));
+  }
+}
+
+async function dispatchDamageAction(action){
+  addTypingIndicator();
+  document.getElementById('send-btn').disabled = true;
+
+  // Build a description prompt based on action
+  const descMap = {
+    full:     'Give a complete damage report with all areas, severities and costs.',
+    safe:     'Focus only on whether this car is safe to drive.',
+    cost:     'Focus on repair cost estimation for all visible damage.',
+    internal: 'Focus on hidden and internal damage that might not be visible.',
+    buy:      'Assess whether this car is worth buying given the damage.',
+    quick:    'Give a brief 2-3 sentence summary of the key damage only.',
+  };
+  const description = descMap[action] || '';
+
+  try {
+    const blob = await (await fetch(`data:${pendingDamageType};base64,${pendingDamageB64}`)).blob();
+    const form = new FormData();
+    form.append('file', blob, 'damage.jpg');
+    if(description) form.append('description', description);
+
+    const r      = await fetch(`${CARID}/damage`, {method:'POST', body:form});
+    const report = await r.json();
+    removeTyping();
+
+    if(!r.ok || report.detail){
+      addBubble('bot', `⚠️ ${report.detail || 'Could not analyse the damage.'}`);
+      return;
+    }
+
+    // Show narrative bubble
+    if(report.message) addBubble('bot', mdToHtml(report.message));
+
+    // Show structured damage card for full/safe/cost/internal/buy actions
+    if(['full','safe','cost','internal','buy'].includes(action)){
+      const card = buildDamageCard(report);
+      const d = document.createElement('div'); d.className = 'msg bot';
+      d.innerHTML = `<div class="bubble" style="padding:0;overflow:hidden;border-radius:14px">${card}</div><span class="msg-time">${now()}</span>`;
+      msgsEl.appendChild(d); msgsEl.scrollTop = msgsEl.scrollHeight;
+    }
+
+    // Save to history
+    if(activeId){
+      pushHistory(activeId, 'assistant', report.message || 'Damage analysis complete.');
+      persistMessage('[Damage photo uploaded]', report.message || '', getSession(activeId)?.convId);
+    }
+
+    // Context chips
+    addChips([
+      'What are the repair priorities?',
+      'Should I buy this car?',
+      'How long will repairs take?',
+    ]);
+
+  } catch(e){
+    removeTyping();
+    addBubble('bot', `⚠️ Error: ${e.message}`);
+  }
+
+  pendingDamageB64 = null; pendingDamageType = null;
+  document.getElementById('send-btn').disabled = false;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DAMAGE CARD BUILDER
+// ═══════════════════════════════════════════════════════════════
+
+function sevEmoji(s){
+  return s==='minor'?'🟢':s==='moderate'?'🟡':s==='severe'?'🔴':'⚫';
+}
+function likEmoji(l){
+  return l==='likely'?'🔴':l==='possible'?'🟡':'🔵';
+}
+function fmtCost(min,max){
+  const fmt=n=>n>=1000?'$'+Math.round(n/1000)+'k':'$'+n;
+  return `${fmt(min)} – ${fmt(max)}`;
+}
+
+function buildDamageCard(report){
+  const nodrv = !report.safe_to_drive
+    ? `<div class="no-drive-banner">⛔ DO NOT DRIVE THIS CAR — safety risk detected</div>`
+    : '';
+
+  const overallEmoji = sevEmoji(report.overall_severity || 'minor');
+  const overallLabel = (report.overall_severity || 'unknown').toUpperCase();
+
+  const header = `<div class="dmg-header">
+    <span class="dmg-overall">${overallEmoji} ${overallLabel} DAMAGE</span>
+    <span class="dmg-cost">Est. total: ${fmtCost(report.total_cost_min||0, report.total_cost_max||0)}</span>
+  </div>`;
+
+  // Damage areas
+  let areasHtml = '';
+  if(report.damage_areas?.length){
+    const rows = report.damage_areas.map(a=>`
+      <div class="dmg-area-row">
+        <span class="dmg-emoji">${sevEmoji(a.severity)}</span>
+        <div class="dmg-area-info">
+          <div class="dmg-area-top">
+            <span class="dmg-component">${esc(a.component)}</span>
+            <span class="sev-badge sev-${a.severity}">${a.severity}</span>
+          </div>
+          <div class="dmg-desc">${esc(a.description)}</div>
+          <div class="dmg-cost-range">${fmtCost(a.repair_cost_min, a.repair_cost_max)}</div>
+        </div>
+      </div>`).join('');
+    areasHtml = `<div class="dmg-section-title">🔍 Visible Damage</div>${rows}`;
+  }
+
+  // Internal risks
+  let internalHtml = '';
+  if(report.internal_risks?.length){
+    const rows = report.internal_risks.map(r=>`
+      <div class="int-risk-row">
+        <span class="dmg-emoji">${likEmoji(r.likelihood)}</span>
+        <div class="int-risk-info">
+          <div class="int-risk-top">
+            <span class="dmg-component">${esc(r.component)}</span>
+            <span class="lik-badge lik-${r.likelihood}">${r.likelihood}</span>
+          </div>
+          <div class="dmg-desc">${esc(r.reason)}</div>
+          <div class="dmg-cost-range">${fmtCost(r.repair_cost_min, r.repair_cost_max)} if damaged</div>
+        </div>
+      </div>`).join('');
+    internalHtml = `<div class="dmg-section-title">🔧 Suspected Internal Damage</div>${rows}
+      <div class="dmg-disclaimer">⚠️ Internal damage is inferred from mechanical causation rules — always get a workshop inspection before buying or repairing.</div>`;
+  }
+
+  // Priority actions
+  let priorityHtml = '';
+  if(report.priority_actions?.length){
+    const items = report.priority_actions.map((a,i)=>
+      `<div class="dmg-priority-item"><span class="dmg-priority-num">${i+1}</span><span>${esc(a)}</span></div>`
+    ).join('');
+    priorityHtml = `<div class="dmg-section-title">⚡ Priority Actions</div><div class="dmg-priority-row">${items}</div>`;
+  }
+
+  return `<div class="dmg-card">${nodrv}${header}${areasHtml}${internalHtml}${priorityHtml}</div>`;
+}
+function buildResultCard(car, confidence, status){
+  const pct=confidence||0;
+  const cls=pct>=75?'conf-high':pct>=50?'conf-med':'conf-low';
+  const badge=status==='known'?'badge-found':status==='uncertain'?'badge-uncertain':'badge-web';
+  const label=status==='known'?'Identified':status==='uncertain'?'Possible match':'Web match';
+  return `<div class="result-card">
+    <span class="badge ${badge}">${label}</span>
+    <h3>${car.brand||'?'} ${car.model||'?'}</h3>
+    <div class="confidence-bar"><div class="confidence-fill ${cls}" style="width:${pct}%"></div></div>
+    <p style="font-size:11px;color:var(--sub);margin-bottom:7px">Confidence: ${pct}%</p>
+    ${!bad(car.generation)?`<div class="spec-row"><span class="spec-label">Generation</span><span class="spec-val">${car.generation}</span></div>`:''}
+    ${!bad(car.year)?`<div class="spec-row"><span class="spec-label">Year range</span><span class="spec-val">${car.year}</span></div>`:''}
+    ${!bad(car.engine)?`<div class="spec-row"><span class="spec-label">Engine</span><span class="spec-val">${car.engine}</span></div>`:''}
+    ${!bad(car.body)?`<div class="spec-row"><span class="spec-label">Body / Fuel</span><span class="spec-val">${car.body}</span></div>`:''}
+    ${!bad(car.color)?`<div class="spec-row"><span class="spec-label">Color</span><span class="spec-val">${car.color}</span></div>`:''}
+    <div class="pros-cons">
+      <div class="pc-box pros"><strong>Pros</strong>${!bad(car.pros)?car.pros:'Not available yet'}</div>
+      <div class="pc-box cons"><strong>Cons</strong>${!bad(car.cons)?car.cons:'Not available yet'}</div>
+    </div>
+  </div>`;
+}
+
+// FEATURE 5: AutoHub button inside result card
+function buildAutoHubBtn(brand, model){
+  const q=encodeURIComponent(`${brand} ${model}`.trim());
+  return `<a class="autohub-btn" href="${AUTOHUB_POSTS}?search=${q}" target="_blank">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+    Find on AutoHub
+  </a>`;
+}
+
+function buildCompareTable(cars, summary){
+  if(!cars?.length) return '';
+  const fields=[
+    {key:'price_range',label:'Price Range'},
+    {key:'engine',label:'Engine'},
+    {key:'fuel',label:'Fuel'},
+    {key:'reliability',label:'Reliability'},
+    {key:'pros',label:'Pros',cls:'compare-pros'},
+    {key:'cons',label:'Cons',cls:'compare-cons'},
+    {key:'verdict',label:'Best for',rowCls:'compare-verdict-row'},
+  ];
+  const thead=`<tr><th class="compare-row-label"></th>${cars.map(c=>`<th class="compare-car-col">${c.name||'?'}</th>`).join('')}</tr>`;
+  const tbody=fields.map(f=>{
+    const cells=cars.map(c=>`<td class="compare-cell ${f.cls||''}">${String(c[f.key]||'—').replace(/•/g,'\n•')}</td>`).join('');
+    return `<tr class="${f.rowCls||''}"><td class="compare-field-label">${f.label}</td>${cells}</tr>`;
+  }).join('');
+  return `<div class="compare-wrap">
+    <div class="compare-scroll"><table class="compare-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>
+    ${summary?`<div class="compare-summary">💡 ${summary}</div>`:''}
+  </div>`;
+}
+
+// ── Option buttons ──────────────────────────────────────────
+function addOptions(question, options, onSelect){
+  // FEATURE 1 FIX: question shown ONLY as the options header, not in a separate bubble
+  const wrap=document.createElement('div'); wrap.className='msg bot';
+  const letters=['A','B','C','D'];
+  const btns=options.map((opt,i)=>`<button class="option-btn" data-val="${esc(opt)}"><span class="opt-icon">${letters[i]||'•'}</span>${esc(opt)}</button>`).join('');
+  wrap.innerHTML=`<div class="bubble" style="padding:12px 14px">
+    <div style="font-size:14px;font-weight:600;margin-bottom:10px;color:var(--text)">${esc(question)}</div>
+    <div class="options-wrap">${btns}</div>
+  </div><span class="msg-time">${now()}</span>`;
+  wrap.querySelectorAll('.option-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      wrap.querySelector('.options-wrap').classList.add('options-disabled');
+      btn.style.cssText='border-color:var(--blue);background:var(--blue-light);color:var(--blue)';
+      btn.querySelector('.opt-icon').style.cssText='border-color:var(--blue);color:var(--blue)';
+      onSelect(btn.dataset.val);
+    });
+  });
+  msgsEl.appendChild(wrap); msgsEl.scrollTop=msgsEl.scrollHeight;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SEND MESSAGE
+// ═══════════════════════════════════════════════════════════════
+async function sendMessage(){
+  const text=inputEl.value.trim();
+  const hasImg=!!pendingB64;
+  if(!text&&!hasImg) return;
+  if(!activeId) return;
+  inputEl.value=''; inputEl.style.height='40px';
+  if(text) addBubble('user',esc(text));
+  addTypingIndicator();
+  document.getElementById('send-btn').disabled=true;
+  isStreaming=true;
+
+  const s=getSession(activeId);
+  const isFirst=s?.title==='New Chat';
+  if(isFirst&&text) updateSession(activeId,{title:text.length>30?text.slice(0,30)+'…':text});
+
+  try{
+    if(hasImg&&!text) await handleImage();
+    else if(hasImg&&text) await handleImageWithText(text);
+    else await handleText(text);
+  }catch(e){
+    removeTyping();
+    addBubble('bot',`⚠️ Error: ${e.message}`);
+  }
+  pendingB64=null; pendingType=null;
+  isStreaming=false;
+  document.getElementById('send-btn').disabled=false;
+}
+
+// ── Image only → show intent picker first, then /identify ────
+// ── Image only → show intent picker (called from sendMessage) ─
+async function handleImage(){
+  // Show car intent picker — image data is in pendingB64/pendingType
+  removeTyping();
+  showIntentPicker(pendingB64, pendingType, false);
+  // Don't clear pendingB64 here — showIntentPicker captures it in closure
+  pendingB64 = null; pendingType = null;
+}
+
+// ── Image + text → /chat-with-image ─────────────────────────
+async function handleImageWithText(text){
+  const blob=await(await fetch(`data:${pendingType};base64,${pendingB64}`)).blob();
+  const form=new FormData();
+  form.append('image',blob,'car.jpg');
+  form.append('message',text);
+  form.append('conversationId',getSession(activeId)?.convId||'');
+  const r=await fetch(`${AUTOHUB}/chat-with-image`,{method:'POST',headers:authHeaders(),body:form});
+  const result=await r.json();
+  removeTyping();
+  if(!r.ok||result.success===false){ addBubble('bot',result.message||'Could not analyse that image.'); return; }
+  const data=result.data||result;
+  const ans=data.reply||data.answer||data.message||'';
+  addBubble('bot',mdToHtml(ans));
+  pushHistory(activeId,'assistant',ans);
+  addChips(['Tell me more','What about reliability?','Compare with similar cars']);
+}
+
+// ── Text → /chat with streaming + smart chips ─────────────────
+async function handleText(text){
+  const s=getSession(activeId);
+  // Detect language from this message
+  if(isArabic(text)) userLang='ar';
+  pushHistory(activeId,'user',text);
+
+  const payload={
+    question:text, message:text,
+    conversationId:s?.convId||'',
+    history:(s?.history||[]).slice(0,-1),
+    car_context:s?.carCtx||{},
+    buyer_mode:s?.buyerMode||false,
+    buyer_profile:s?.buyerProfile||{...EMPTY_PROFILE},
+    user_location: userLocation,
+    user_lang:     userLang,
+  };
+
+  // FEATURE 1: try streaming first, fallback to normal
+  let result;
+  try{
+    // For non-streaming fallback (since HuggingFace may not support streaming)
+    // we simulate word-by-word reveal for buyer/clarify (short) responses
+    const r=await fetch(`${CARID}/chat`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    result=await r.json();
+    removeTyping();
+  }catch(e){
+    removeTyping();
+    addBubble('bot','⚠️ Could not reach the server.');
+    return;
+  }
+
+  const intent=result.intent||'chat';
+  const answer=result.answer||result.reply||'';
+
+  if(result.buyer_mode!==undefined){
+    updateSession(activeId,{buyerMode:result.buyer_mode,buyerProfile:result.buyer_profile||s?.buyerProfile});
+  }
+
+  // Persist location and language for future requests
+  if(result.user_location) userLocation = result.user_location;
+  if(result.user_lang)     userLang     = result.user_lang;
+
+  // ── Compare → table ────────────────────────────────────────
+  if(intent==='compare'&&result.compare_data?.length>=2){
+    const table=buildCompareTable(result.compare_data,answer);
+    addBubble('bot',table);
+    pushHistory(activeId,'assistant',answer);
+    persistMessage(text,answer,s?.convId).then(id=>{ if(id) updateSession(activeId,{convId:id}); });
+    const names=result.compare_data.map(c=>c.name||'').filter(Boolean);
+    // FEATURE 5: add AutoHub links for compared cars
+    if(names.length>=2){
+      const d=document.createElement('div'); d.className='msg bot';
+      d.innerHTML=`<div class="bubble" style="padding:10px 14px;display:flex;gap:8px;flex-wrap:wrap">
+        ${names.slice(0,2).map(n=>`<a class="autohub-btn" href="${AUTOHUB_POSTS}?search=${encodeURIComponent(n)}" target="_blank">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          ${n} on AutoHub</a>`).join('')}
+      </div>`;
+      msgsEl.appendChild(d); msgsEl.scrollTop=msgsEl.scrollHeight;
+    }
+    addChips([...names.slice(0,2).map(n=>`Tell me more about the ${n}`),'Which one should I buy?']);
+    return;
+  }
+
+  // ── Clarify → orange bubble + option buttons ────────────────
+  if(intent==='clarify'){
+    if(result.options?.length){
+      // FEATURE 1 FIX: show ONLY the options block, no separate bubble
+      addOptions(answer,result.options,val=>{
+        addBubble('user',esc(val));
+        pushHistory(activeId,'user',val);
+        addTypingIndicator();
+        document.getElementById('send-btn').disabled=true;
+        handleText(val).finally(()=>{ document.getElementById('send-btn').disabled=false; });
+      });
+    } else {
+      addBubble('bot',mdToHtml(answer),now(),'clarify-bubble');
+    }
+    pushHistory(activeId,'assistant',answer);
+    persistMessage(text,answer,s?.convId).then(id=>{ if(id) updateSession(activeId,{convId:id}); });
+    return;
+  }
+
+  // ── Recommend → answer + car chips ─────────────────────────
+  if(intent==='recommend'&&result.recommendations?.length){
+    // FEATURE 1: animate text reveal for recommendations
+    await animateText(answer);
+    pushHistory(activeId,'assistant',answer);
+    persistMessage(text,answer,s?.convId).then(id=>{ if(id) updateSession(activeId,{convId:id}); });
+    addChips(result.recommendations.map(n=>`Tell me more about the ${n}`));
+    return;
+  }
+
+  // ── Buyer question → ONLY option buttons, no separate bubble ─
+  if(intent==='buyer'){
+    // FEATURE 1 FIX: question shown only as options header
+    if(result.options?.length){
+      addOptions(answer,result.options,val=>{
+        addBubble('user',esc(val));
+        pushHistory(activeId,'user',val);
+        addTypingIndicator();
+        document.getElementById('send-btn').disabled=true;
+        handleText(val).finally(()=>{ document.getElementById('send-btn').disabled=false; });
+      });
+    } else {
+      addBubble('bot',mdToHtml(answer));
+    }
+    pushHistory(activeId,'assistant',answer);
+    persistMessage(text,answer,s?.convId).then(id=>{ if(id) updateSession(activeId,{convId:id}); });
+    return;
+  }
+
+  // ── Normal chat → animate text + FEATURE 3 smart chips ──────
+  await animateText(answer);
+  pushHistory(activeId,'assistant',answer);
+  persistMessage(text,answer,s?.convId).then(id=>{ if(id) updateSession(activeId,{convId:id}); });
+  // FEATURE 3: smart context-aware chips
+  addChips(smartChips(answer,s?.carCtx,intent));
+
+  if(!s?.carCtx){
+    const brand=inferBrand(text+' '+answer);
+    if(brand) setCarCtx(activeId,{brand});
+  }
+}
+
+// ── FEATURE 1: Animated text reveal (simulates streaming) ────
+async function animateText(text){
+  const html  = mdToHtml(text);
+  const isAr  = ARABIC_RE.test(text);
+  const d=document.createElement('div'); d.className='msg bot';
+  const bubble=document.createElement('div');
+  bubble.className='bubble stream-cursor';
+  if(isAr){ bubble.setAttribute('dir','rtl'); bubble.style.textAlign='right'; }
+  const timeEl=document.createElement('span'); timeEl.className='msg-time'; timeEl.textContent=now();
+  d.appendChild(bubble); d.appendChild(timeEl);
+  msgsEl.appendChild(d);
+  const words=html.split(/(?<=>\s*|\s)(?=\S)/);
+  let built='';
+  for(const w of words){
+    built+=w; bubble.innerHTML=built;
+    msgsEl.scrollTop=msgsEl.scrollHeight;
+    await new Promise(r=>setTimeout(r,18));
+  }
+  bubble.classList.remove('stream-cursor');
+}
+
+// ── Damage file input ─────────────────────────────────────────
+document.getElementById('damage-input').addEventListener('change',function(e){
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const src=ev.target.result;
+    const b64=src.split(',')[1];
+    // Show image preview as user message
+    const d=document.createElement('div'); d.className='msg user';
+    d.innerHTML=`<div class="bubble" style="padding:8px"><img src="${src}" style="max-width:200px;border-radius:8px;display:block" alt="Damage"/></div><span class="msg-time" style="text-align:right">${now()}</span>`;
+    msgsEl.appendChild(d); msgsEl.scrollTop=msgsEl.scrollHeight;
+    // Show damage intent picker
+    showIntentPicker(b64, file.type, true);
+  };
+  reader.readAsDataURL(file); e.target.value='';
+});
+document.getElementById('file-input').addEventListener('change',function(e){
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const src=ev.target.result;
+    const b64=src.split(',')[1];
+    const d=document.createElement('div'); d.className='msg user';
+    d.innerHTML=`<div class="bubble" style="padding:8px"><img src="${src}" style="max-width:200px;border-radius:8px;display:block" alt="Car"/></div><span class="msg-time" style="text-align:right">${now()}</span>`;
+    msgsEl.appendChild(d); msgsEl.scrollTop=msgsEl.scrollHeight;
+    // Show car intent picker instead of immediately identifying
+    showIntentPicker(b64, file.type, false);
+  };
+  reader.readAsDataURL(file); e.target.value='';
+});
+
+// ═══════════════════════════════════════════════════════════════
+// KEYBOARD
+// ═══════════════════════════════════════════════════════════════
+function handleKey(e){
+  if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendMessage(); }
+  // Auto-switch textarea direction based on content
+  const txt = e.target.value || '';
+  e.target.dir = isArabic(txt) ? 'rtl' : 'ltr';
+  setTimeout(()=>{ inputEl.style.height='40px'; inputEl.style.height=Math.min(inputEl.scrollHeight,120)+'px'; },0);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FEATURE 3: WELCOME SCREEN WITH STARTER CARDS
+// ═══════════════════════════════════════════════════════════════
+const STARTER_CARDS=[
+  {emoji:'🏎️',title:'BMW M4 vs Mercedes C63',sub:'Performance showdown — which one wins?',query:'Compare BMW M4 vs Mercedes C63'},
+  {emoji:'👨‍👩‍👧',title:'Best family SUV under $30k',sub:'Safety, space, reliability — all covered.',query:'What is the best family SUV under $30k?'},
+  {emoji:'⚡',title:'Electric cars in 2025',sub:'Top EVs worth buying right now.',query:'What are the best electric cars to buy in 2025?'},
+  {emoji:'🔍',title:'Scan for damage',sub:'Upload a photo — I\'ll assess all damage & costs.',query:null,isDamage:true},
+  {emoji:'📸',title:'Identify your car',sub:'Upload a photo — I\'ll tell you everything.',query:null,isDamage:false},
+];
+
+function bootWelcome(){
+  addBubble('bot',
+    `Hey! I'm <strong>CarID</strong> — your AI car expert. 🚗<br><br>`+
+    `I can <strong>identify cars from photos</strong>, answer any car question, `+
+    `<strong>compare models side by side</strong>, and help you <strong>find the perfect car to buy</strong>. `+
+    `What do you want to know?`
+  );
+
+  // FEATURE 3: Starter cards
+  const d=document.createElement('div'); d.className='msg bot';
+  const cards=STARTER_CARDS.map(c=>{
+    let onclick;
+    if(c.query) onclick=`chipClick('${c.query.replace(/'/g,"\\'")}')`;
+    else if(c.isDamage) onclick=`document.getElementById('damage-input').click()`;
+    else onclick=`document.getElementById('file-input').click()`;
+    return `<div class="starter-card" onclick="${onclick}">
+      <div class="sc-emoji">${c.emoji}</div>
+      <div class="sc-title">${c.title}</div>
+      <div class="sc-sub">${c.sub}</div>
+    </div>`;
+  }).join('');
+  d.innerHTML=`<div class="bubble" style="padding:10px 14px">
+    <div style="font-size:12px;font-weight:600;color:var(--sub);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Try asking…</div>
+    <div class="starter-grid">${cards}</div>
+  </div>`;
+  msgsEl.appendChild(d);
+
+  // Upload zone
+  const uz=document.createElement('div'); uz.className='msg bot';
+  uz.innerHTML=`<div class="bubble" style="padding:8px">
+    <div class="upload-zone" onclick="document.getElementById('file-input').click()">
+      <div class="up-icon">📷</div>
+      <p>Or upload a car photo to identify it instantly</p>
+      <p style="font-size:11px;margin-top:3px;color:#aaa">JPG, PNG, WEBP — max 20 MB</p>
+    </div></div>`;
+  msgsEl.appendChild(uz);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+(async function init(){
+  // Load user name
+  try{
+    const r=await fetch('https://graduation-project-autohub-production.up.railway.app/api/auth/me',{headers:authHeaders()});
+    if(r.ok){
+      const data=await r.json();
+      const user=data.user||data.data||data;
+      const name=user?.name||user?.email||'User';
+      document.getElementById('user-name-sb').textContent=name;
+      document.getElementById('user-avatar').textContent=name.charAt(0).toUpperCase();
+    }
+  }catch(e){}
+
+  const list=await fetchConversations();
+  if(list.length){
+    sessions=list.map(c=>({
+      ...makeSession(String(c.id||c._id)),
+      title:c.title||c.name||'Chat',
+      convId:String(c.id||c._id),
+      updatedAt:new Date(c.updatedAt||c.updated_at||Date.now()).getTime(),
+    })).sort((a,b)=>b.updatedAt-a.updatedAt);
+    renderConvList();
+    activeId=sessions[0].id;
+    renderConvList();
+    await openSession(sessions[0].id);
+  } else {
+    startNewChat(true);
+  }
+})();
+</script>
+</body>
+</html>
